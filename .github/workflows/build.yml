@@ -5,17 +5,86 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Unpack project
+      - name: Assemble project from files
         run: |
-          ZIP=$(find . -name "*.zip" -not -path "./.git/*" | head -n 1)
-          echo "Found zip: $ZIP"
-          if [ -z "$ZIP" ]; then
-            echo "No zip in repo. Files present:"
-            ls -R
-            exit 1
-          fi
-          unzip -q "$ZIP" -d proj
-          ls proj
+          set -e
+          P=proj
+          mkdir -p $P/app/src/main/java/com/jobagent $P/app/src/main/res/xml $P/app/src/main/res/values
+          get() { find . -name "$1" -not -path "./$P/*" -not -path "./.git/*" | head -n 1; }
+          need() {
+            S=$(get "$1")
+            if [ -z "$S" ]; then echo "MISSING FILE: $1"; ls -R; exit 1; fi
+            cp "$S" "$2"
+          }
+          for f in AgentService.kt ApiClient.kt MainActivity.kt Profile.kt ScreenReader.kt; do
+            need $f $P/app/src/main/java/com/jobagent/
+          done
+          need AndroidManifest.xml $P/app/src/main/
+          need accessibility_config.xml $P/app/src/main/res/xml/
+          need strings.xml $P/app/src/main/res/values/
+
+          cat > $P/settings.gradle.kts <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "jobagent"
+          include(":app")
+          EOF
+
+          cat > $P/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application") version "8.7.3" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+          }
+          EOF
+
+          cat > $P/gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          android.nonTransitiveRClass=true
+          EOF
+
+          cat > $P/app/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+
+          android {
+              namespace = "com.jobagent"
+              compileSdk = 34
+
+              defaultConfig {
+                  applicationId = "com.jobagent"
+                  minSdk = 26
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "0.1"
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+          }
+          EOF
+
+          find $P -type f | sort
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
