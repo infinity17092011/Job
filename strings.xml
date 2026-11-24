@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="service_desc">Lets JobAgent read the Indeed app screen and tap buttons to submit job applications you asked it to make.</string>
+</resources>
