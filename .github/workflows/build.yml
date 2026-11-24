@@ -6,7 +6,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Unpack project
-        run: unzip -q jobagent-android.zip -d proj
+        run: |
+          ZIP=$(find . -name "*.zip" -not -path "./.git/*" | head -n 1)
+          echo "Found zip: $ZIP"
+          if [ -z "$ZIP" ]; then
+            echo "No zip in repo. Files present:"
+            ls -R
+            exit 1
+          fi
+          unzip -q "$ZIP" -d proj
+          ls proj
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
